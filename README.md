@@ -10,11 +10,11 @@ Please note, `lite-xl-ide` is still **experimental**; it is not ready for releas
 
 ## Table of Contents
 
-1. [Quickstart][#quickstart]
-2. [Plugins][#plugins]
-3. [IDE Support Status][#ide-support-status]
-  1. [Language Support][#language-support]
-  2. [IDE Bundle Support][#ide-bundle-support]
+1. [Quickstart](#quickstart)
+2. [Plugins](#plugins)
+3. [IDE Support Status](#ide-support-status)
+  1. [Language Support](#language-support)
+  2. [IDE Bundle Support](#ide-bundle-support)
 
 ## Quickstart
 
