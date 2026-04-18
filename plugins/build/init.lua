@@ -182,21 +182,27 @@ local function default_on_line(line)
   build.message_view:add_message(build.parse_compile_line(line))
 end
 
--- accept a table of commands. Run as many as we have threads.
-function build.run_tasks(tasks, on_done, on_line)
+-- WIP: accept a table of commands. Run as many as we have threads.
+function build.run_tasks(is_serial, tasks, on_done, on_line)
+  
   if #tasks == 0 then
     if on_done then on_done(0) end
     return
   end
+  
+  -- ?
   local bundle = { tasks = {}, on_done = on_done, on_line = (on_line or default_on_line)  }
   for i, task in ipairs(tasks) do
     table.insert(bundle.tasks, { cmd = task, program = nil, done = false })
   end
   table.insert(build.running_bundles, bundle)
 
+  -- ?
   if build.thread and core.threads[build.thread] and coroutine.status(core.threads[build.thread].cr) == "dead" then build.thread = nil end
   if not build.thread then
     build.thread = core.add_thread(function()
+      
+      -- 1
       local function handle_output(bundle, output)
         if output ~= nil then
           local offset = 1
@@ -210,15 +216,22 @@ function build.run_tasks(tasks, on_done, on_line)
         end
       end
 
+      -- 2
       while #build.running_bundles > 0 do
         local total_running = 0
         local yield_time = build.interval
         local status, err = pcall(function()
+
+          -- 3
           for i, bundle in ipairs(build.running_bundles) do
             local has_unfinished, bundle_finished
+            
+            -- 4
             for _, task in ipairs(bundle.tasks) do
               if not task.done then
                 has_unfinished = true
+
+                -- 5
                 if task.program then
                   while true do
                     local output = task.program:read_stdout()
@@ -244,6 +257,8 @@ function build.run_tasks(tasks, on_done, on_line)
                 end
               end
             end
+
+            -- 6
             if not has_unfinished and bundle_finished == nil then bundle_finished = 0 end
             if bundle_finished ~= nil then
               if bundle.on_done then bundle.on_done(bundle_finished) end
@@ -252,20 +267,30 @@ function build.run_tasks(tasks, on_done, on_line)
               break
             end
           end
+          
+          -- 7
           for i, bundle in ipairs(build.running_bundles) do
             if total_running < build.threads then
               for i,task in ipairs(bundle.tasks) do
                 if total_running >= build.threads then break end
                 if not task.done and not task.program then
-                  build.message_view:add_message(table.concat(task.cmd, " "))
-                  task.program = process.start(task.cmd, { ["stderr"] = process.REDIRECT_STDOUT, env = (PLATFORM ~= "Windows" and { TERM = "ansi" } or {}), cwd = core.project_absolute_path(".") })
-                  total_running = total_running + 1
+                  if is_serial then
+                    -- Run commands in series
+                    -- ?
+                  else
+                    -- Run commands in parallel
+                    build.message_view:add_message(table.concat(task.cmd, " "))
+                    task.program = process.start(task.cmd, { ["stderr"] = process.REDIRECT_STDOUT, env = (PLATFORM ~= "Windows" and { TERM = "ansi" } or {}), cwd = core.project_absolute_path(".") })
+                    total_running = total_running + 1
+                  end
                 end
               end
               if total_running >= build.threads then break end
             end
           end
         end)
+
+        -- 8
         if not status then build.message_view:add_message({ "error", err }) end
         coroutine.yield(yield_time)
       end
